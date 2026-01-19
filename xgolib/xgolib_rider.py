@@ -3,8 +3,8 @@ import struct
 import time
 import math
 
-__version__ = '1.0.0'
-__last_modified__ = '2024/12/23'
+__version__ = '1.4.2'
+__last_modified__ = '2024/2/25'
 
 """
 XGOorder 用来存放命令地址和对应数据
@@ -54,10 +54,7 @@ XGOorder = {
     "ARM_R": [0x77, 0],
     "OUTPUT_ANALOG": [0x90, 0],
     "OUTPUT_DIGITAL": [0x91, 0],
-    "LED_COLOR": [0x69, 0, 0, 0],
-    "ANALOG_READ": [0x92, 0],
-    "DIGITIAL_READ": [0x93, 0],
-    "EX_MOTOR": [0xA1, 0x08, 0x00]
+    "LED_COLOR": [0x69, 0, 0, 0]
 }
 
 """
@@ -66,7 +63,9 @@ Xgoparam is used to store the parameter limit range of the robot dog
 """
 XGOparam = {}
 
-
+"""
+数据处理部分（公共部分）
+"""
 def search(data, list):
     for i in range(len(list)):
         if data == list[i]:
@@ -115,35 +114,18 @@ def Byte2Short(rawdata):
 
 def changePara(version):
     global XGOparam
-    if version == 'xgomini':
+    if version == "xgorider":
         XGOparam = {
-            "TRANSLATION_LIMIT": [35, 19.5, [75, 120]],  # X Y Z 平移范围
-            "ATTITUDE_LIMIT": [20, 22, 16],  # Roll Pitch Yaw 姿态范围
-            "LEG_LIMIT": [35, 18, [75, 115]],  # 腿长范围
-            "MOTOR_LIMIT": [[-73, 57], [-66, 93], [-31, 31], [-65, 65], [-85, 50], [-75, 90]],  # 下 中 上 舵机范围
-            "PERIOD_LIMIT": [[1.5, 8]],
-            "MARK_TIME_LIMIT": [10, 35],  # 原地踏步高度范围
-            "VX_LIMIT": 25,  # X速度范围
-            "VY_LIMIT": 18,  # Y速度范围
-            "VYAW_LIMIT": 100,  # 旋转速度范围
-            "ARM_LIMIT": [[-80, 155], [-95, 155], [70, 270], [80, 140]],
-            "ActionTime": {
-                1: 3, 2: 3, 3: 5, 4: 5, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4, 10: 7,
-                11: 7, 12: 5, 13: 7, 14: 10, 15: 6, 16: 6, 17: 4, 18: 6, 19: 10, 20: 9,
-                21: 8, 22: 7, 23: 6, 24: 7, 128: 10, 129: 10, 130: 10, 255: 1}
-        }
-    elif version == 'xgolite':
-        XGOparam = {
-            "TRANSLATION_LIMIT": [25, 18, [60, 110]],
-            "ATTITUDE_LIMIT": [20, 10, 12],
-            "LEG_LIMIT": [25, 18, [60, 110]],
-            "MOTOR_LIMIT": [[-70, 50], [-70, 90], [-30, 30], [-65, 65], [-115, 70], [-85, 100]],
-            "PERIOD_LIMIT": [[1.5, 8]],
-            "MARK_TIME_LIMIT": [10, 25],
-            "VX_LIMIT": 25,
-            "VY_LIMIT": 18,
-            "VYAW_LIMIT": 100,
-            "ARM_LIMIT": [[-80, 155], [-95, 155], [70, 270], [80, 140]],
+            "TRANSLATION_LIMIT": [1, 1, [60, 120]],
+            "ATTITUDE_LIMIT": [17, 1, 1],
+            "LEG_LIMIT": [1, 1, [60, 120]],
+            "MOTOR_LIMIT": [[-1, 1], [-1, 1], [-1, 1], [-1, 1], [-1, 1], [-1, 1]],
+            "PERIOD_LIMIT": [[1, 2]],
+            "MARK_TIME_LIMIT": [-1, 1],
+            "VX_LIMIT": 1.5,
+            "VY_LIMIT": 1.0,
+            "VYAW_LIMIT": 360,
+            "ARM_LIMIT": [[-1, 1], [-1, 1], [-1, 1], [-1, 1]],
             "ActionTime": {
                 1: 3, 2: 3, 3: 5, 4: 5, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4, 10: 7,
                 11: 7, 12: 5, 13: 7, 14: 10, 15: 6, 16: 6, 17: 4, 18: 6, 19: 10, 20: 9,
@@ -151,14 +133,14 @@ def changePara(version):
         }
 
 
-class XGO():
+class XGO_RIDER():
     """
     在实例化XGO时需要指定上位机与机器狗的串口通讯接口
     When instantiating XGO, you need to specify the serial
     communication interface between the upper computer and the machine dog
     """
 
-    def __init__(self, port, baud=115200, version="xgomini", verbose=False):
+    def __init__(self, port, baud=115200, version="xgorider", verbose=False):
         self.verbose = verbose
         self.ser = serial.Serial("/dev/ttyAMA0", baud, timeout=0.5)
         self.ser.flushOutput()
@@ -169,22 +151,29 @@ class XGO():
         self.rx_ADDR = 0
         self.rx_LEN = 0
         self.rx_data = bytearray(50)
-        time.sleep(0.25)
+        time.sleep(0.1)
         self.version = self.read_firmware()
         if self.version[0] == 'M':
-            changePara('xgomini')
+            changePara('xgorider')
+            print("This is a XGO-DOG-M device")
         elif self.version[0] == 'L':
-            changePara('xgolite')
+            changePara('xgorider')
+            print("This is a XGO-DOG-L device")
+        elif self.version[0] == 'W':
+            changePara('xgorider')
+            print("This is a XGO-DOG-W device")
+        elif self.version[0] == 'R':
+            changePara('xgorider')
         else:
+            changePara('xgorider')
             print("ERROR!Can't read firmware version!")
         self.mintime = 0.65
         self.reset()
         self.init_yaw = self.read_yaw()
-        time.sleep(1)
         pass
 
     def __send(self, key, index=1, len=1):
-        mode = 0x00
+        mode = 0x01
         order = XGOorder[key][0] + index - 1
         value = []
         value_sum = 0
@@ -361,7 +350,7 @@ class XGO():
         XGOorder["ACTION"][1] = action_id
         self.__send("ACTION")
         if wait:
-            st = XGOparam["ActionTime"].get(action_id)
+            st = ActionTime.get(action_id)
             if st:
                 time.sleep(st)
 
@@ -512,34 +501,6 @@ class XGO():
             XGOorder["MarkTime"][1] = conver2u8(data, XGOparam["MARK_TIME_LIMIT"], min_value=1)
         self.__send("MarkTime")
 
-    def pace(self, mode):
-        """
-        改变机器狗的踏步频率
-        Change the step frequency of the robot
-        """
-        if mode == "normal":
-            value = 0x00
-        elif mode == "slow":
-            value = 0x01
-        elif mode == "high":
-            value = 0x02
-        else:
-            print("ERROR!Illegal Value!")
-            return
-        XGOorder["MOVE_MODE"][1] = value
-        self.__send("MOVE_MODE")
-
-    def gait_type(self, mode):
-        if mode == "trot":
-            value = 0x00
-        elif mode == "walk":
-            value = 0x01
-        elif mode == "high_walk":
-            value = 0x02
-        elif mode == "slow_trot":
-            value = 0x03
-        XGOorder["GAIT_TYPE"][1] = value
-        self.__send("GAIT_TYPE")
 
     def imu(self, mode):
         """
@@ -643,27 +604,6 @@ class XGO():
         if self.__unpack():
             yaw = Byte2Float(self.rx_data)
         return round(yaw, 2)
-
-    def read_analog(self):
-        self.__read(XGOorder["ANALOG_READ"][0], 1)
-        data = 0
-        if self.__unpack():
-            data = int(self.rx_data[0])
-        return data
-
-    def read_digital(self):
-        self.__read(XGOorder["DIGITIAL_READ"][0], 1)
-        data = 0
-        if self.__unpack():
-            data = int(self.rx_data[0])
-        return data
-
-    def read_rotate_state(self):
-        self.__read(XGOorder["MOVE_TO"][0], 1)
-        state = 0
-        if self.__unpack():
-            state = int(self.rx_data[0])
-        return state
 
     def __unpack(self, timeout=1):
         t = time.time()
@@ -783,62 +723,38 @@ class XGO():
         """
         用于软件标定，请谨慎使用！！！
         """
-        if state == 'start' or state == 1:
+        if state == 'start':
             XGOorder["CALIBRATION"][1] = 1
-        elif state == 'end' or state == 0:
+        elif state == 'end':
             XGOorder["CALIBRATION"][1] = 0
         else:
             print("ERROR!")
         self.__send("CALIBRATION")
         return
 
-    def arm(self, arm_x, arm_z):
-        """
-        控制机器狗的机械臂的前后和上下移动
-        Control the movement of the arm of the robot
-        """
-        try:
-            arm_x_u8 = conver2u8(arm_x, XGOparam["ARM_LIMIT"][0])
-            arm_z_u8 = conver2u8(arm_z, XGOparam["ARM_LIMIT"][1])
-        except:
-            print("Error!Illegal Value!")
+    def btRename(self, name):
+        length = len(name)
+        if not isinstance(name, str):
+            print("Wrong type!")
             return
-        XGOorder["ARM_X"][1] = arm_x_u8
-        XGOorder["ARM_Z"][1] = arm_z_u8
-        self.__send("ARM_X")
-        self.__send("ARM_Z")
 
-    def arm_polar(self, arm_theta, arm_r):
-        """
-        控制机器狗的机械臂的前后和上下移动
-        Control the movement of the arm of the robot
-        """
-        try:
-            arm_theta_u8 = conver2u8(arm_theta, XGOparam["ARM_LIMIT"][2])
-            arm_r_u8 = conver2u8(arm_r, XGOparam["ARM_LIMIT"][3])
-        except:
-            print("Error!Illegal Value!")
+        if length > 20:
+            print("The length of the name needs to be less than 20")
             return
-        XGOorder["ARM_THETA"][1] = arm_theta_u8
-        XGOorder["ARM_R"][1] = arm_r_u8
-        self.__send("ARM_THETA")
-        self.__send("ARM_R")
 
-    def arm_mode(self, mode):
-        if mode != 0x01 and mode != 0x00:
-            print("Error!Illegal Value!")
+        if not name.isalnum():
+            print("The name can only contain numbers and letters")
             return
-        XGOorder["ARM_MODE"][1] = mode
-        self.__send("ARM_MODE")
 
-    def claw(self, pos):
-        try:
-            claw_pos = conver2u8(pos, [0, 255])
-        except:
-            print("Error!Illegal Value!")
-            return
-        XGOorder["CLAW"][1] = claw_pos
-        self.__send("CLAW")
+        XGOorder["BT_NAME"] = [0x13]
+        for c in list(name):
+            if ord(c) > 255:
+                print("The name can only contain numbers and letters")
+                return
+            else:
+                XGOorder["BT_NAME"].append(ord(c))
+        print(XGOorder["BT_NAME"])
+        self.__send("BT_NAME", len=length)
 
     def moveToMid(self):
         self.__send("MOVE_TO_MID")
@@ -853,33 +769,12 @@ class XGO():
         else:
             return
 
-    def teach_arm(self, mode, pos_id):
-        if mode == "play":
-            XGOorder["TEACH_ARM_PLAY"][1] = pos_id
-            self.__send("TEACH_ARM_PLAY")
-        if mode == "record":
-            XGOorder["TEACH_ARM_RECORD"][1] = pos_id
-            self.__send("TEACH_ARM_RECORD")
-        else:
-            return
-
-    def arm_speed(self, speed):
-        if speed < 0 or speed > 255:
-            print("ERROR!Illegal Value!The speed parameter needs to be between 0 and 255!")
-            return
-        if speed == 0:
-            speed = 1
-        XGOorder["ARM_SPEED"][1] = speed
-        self.__send("ARM_SPEED")
 
     def read_imu(self):
         self.__read(0x65, 24)
         result = []
         if self.__unpack():
-            if self.version[0] == "R":
-                result = self.unpack_imu_r()
-            else:
-                result = self.unpack_imu()
+            result = self.unpack_imu()
         return result
 
     def read_imu_int16(self, direction):
@@ -915,36 +810,15 @@ class XGO():
                 result.append(struct.unpack("!f", a)[0] / 180 * 3.14)
         return result
 
-    def unpack_imu_r(self):
-        result = []
-        for i in range(6):
-            a = bytearray()
-            a.append(self.rx_data[4 * i + 3])
-            a.append(self.rx_data[4 * i + 2])
-            a.append(self.rx_data[4 * i + 1])
-            a.append(self.rx_data[4 * i])
-            result.append(struct.unpack("!f", a)[0])
-        return result
-
     def set_origin(self):
         XGOorder["SET_ORIGIN"][1] = 1
         self.__send("SET_ORIGIN")
 
-    def move_to(self, data, wait=True, overtime=15.0):
+    def move_to(self, data):
         packed_data = struct.pack('>h', data)
         XGOorder["MOVE_TO"][1] = packed_data[0]
         XGOorder["MOVE_TO"][2] = packed_data[1]
         self.__send("MOVE_TO", len=2)
-        time.sleep(0.1)
-
-        t_s = time.time()
-        while time.time() - t_s < overtime:  # 等待旋转结束或者超时
-            flag = self.read_rotate_state()
-            if flag:
-                break
-            time.sleep(0.1)
-
-        time.sleep(0.5)  # 停止旋转后短暂延时
 
     def output_analog(self, data):
         XGOorder["OUTPUT_ANALOG"][1] = data
@@ -956,9 +830,150 @@ class XGO():
         self.__send("OUTPUT_DIGITAL")
         pass
 
-    def extern_motor(self, position):
-        low = (int(struct.pack("h", position)[0]))
-        high = (int(struct.pack("h", position)[1]))
-        XGOorder["EX_MOTOR"][1] = high
-        XGOorder["EX_MOTOR"][2] = low
-        self.__send("EX_MOTOR", len=2)
+    ############# RIDER ################
+
+    def rider_move_x(self, speed, runtime=0):
+        XGOorder["VX"][1] = conver2u8(speed, XGOparam["VX_LIMIT"])
+        self.__send("VX")
+        if runtime:
+            time.sleep(runtime)
+            XGOorder["VX"][1] = conver2u8(0, XGOparam["VX_LIMIT"])
+            self.__send("VX")
+
+    def rider_turn(self, speed, runtime=0):
+        XGOorder["VYAW"][1] = conver2u8(speed, XGOparam["VYAW_LIMIT"])
+        self.__send("VYAW")
+        if runtime:
+            time.sleep(runtime)
+            XGOorder["VYAW"][1] = conver2u8(0, XGOparam["VYAW_LIMIT"])
+            self.__send("VYAW")
+
+    def rider_reset_odom(self):
+        XGOorder["SET_ORIGIN"][1] = 1
+        self.__send("SET_ORIGIN")
+
+    def rider_action(self, action_id, wait=False):
+        if action_id <= 0 or action_id > 255:
+            print("ERROR!Illegal Action ID!")
+            return
+        XGOorder["ACTION"][1] = action_id
+        self.__send("ACTION")
+        if wait:
+            st = XGOparam["ActionTime"].get(action_id)
+            if st:
+                time.sleep(st)
+
+    def rider_balance_roll(self, mode):
+        if mode != 0 and mode != 1:
+            print("ERROR!Illegal Value!")
+            return
+        XGOorder["IMU"][1] = mode
+        self.__send("IMU")
+
+    def rider_perform(self, mode):
+        if mode != 0 and mode != 1:
+            print("ERROR!Illegal Value!")
+            return
+        XGOorder["PERFORM"][1] = mode
+        self.__send("PERFORM")
+
+    def rider_calibration(self, state):
+        """
+        用于软件标定，请谨慎使用！！！
+        """
+        if state == 'start':
+            XGOorder["CALIBRATION"][1] = 1
+        elif state == 'end':
+            XGOorder["CALIBRATION"][1] = 0
+        else:
+            print("ERROR!")
+        self.__send("CALIBRATION")
+        return
+
+    def rider_height(self, data):
+        self.__translation("z", data)
+
+    def rider_roll(self, data):
+        self.__attitude("r", data)
+
+    def rider_periodic_roll(self, period):
+        self.__periodic_rot("r", period)
+
+    def rider_periodic_z(self, period):
+        self.__periodic_tran("z", period)
+
+    def rider_read_battery(self):
+        self.__read(XGOorder["BATTERY"][0], 1)
+        battery = 0
+        if self.__unpack():
+            battery = int(self.rx_data[0])
+        return battery
+
+    def rider_read_firmware(self):
+        self.__read(XGOorder["FIRMWARE_VERSION"][0], 10)
+        firmware_version = 'Null'
+        if self.__unpack():
+            data = self.rx_data[0:10]
+            try:
+                firmware_version = data.decode("ascii").strip('\0')
+            except Exception as e:
+                print(e)
+        return firmware_version
+
+    def rider_read_roll(self):
+        self.__read(XGOorder["ROLL"][0], 4)
+        roll = 0
+        if self.__unpack():
+            roll = Byte2Float(self.rx_data)
+        return round(roll, 2)
+
+    def rider_read_pitch(self):
+        self.__read(XGOorder["PITCH"][0], 4)
+        pitch = 0
+        if self.__unpack():
+            pitch = Byte2Float(self.rx_data)
+        return round(pitch, 2)
+
+    def rider_read_yaw(self):
+        self.__read(XGOorder["YAW"][0], 4)
+        yaw = 0
+        if self.__unpack():
+            yaw = Byte2Float(self.rx_data)
+        return round(yaw, 2)
+
+    def rider_read_imu_int16(self, direction):
+        if direction == "roll":
+            self.__read(0x66, 2)
+        elif direction == "pitch":
+            self.__read(0x67, 2)
+        elif direction == "yaw":
+            self.__read(0x68, 2)
+        else:
+            return None
+        result = []
+        if self.__unpack():
+            result = Byte2Short(self.rx_data)
+        return result
+
+    def rider_reset(self):
+        return self.reset()
+
+    def rider_upgrade(self, filename):
+        XGOorder["UPGRADE"][1] = 1
+        self.ser.flush()
+        self.__send("UPGRADE")
+        if self.__unpack(10):
+            if self.rx_data[0] == 0x55:
+                time.sleep(1)
+                print("Start!")
+                self.__send_bin(filename)
+            else:
+                print("Upgrade Response Error!")
+        else:
+            print("Upgrade Timeout!")
+
+    def rider_led(self, index, color):
+        XGOorder["LED_COLOR"][0] = 0x68 + index
+        XGOorder["LED_COLOR"][1:4] = color
+        self.__send("LED_COLOR", len=3)
+
